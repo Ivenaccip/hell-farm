@@ -1,0 +1,59 @@
+# Handoff — Juego para "Tiny Game, Big Twist Jam"
+
+> Documento para continuar el diseño de este juego con otro asistente. Resume el contexto, las decisiones tomadas (con su porqué) y lo que sigue abierto. Lo cerrado no hace falta re-discutirlo; lo abierto está al final.
+
+## El jam
+- Jam de **3 días**: hacer un juego pequeño con un giro grande e inesperado.
+- Tema: **"Everything Changes"** — debe haber un momento donde cambien las reglas, el mundo, el objetivo, el género, la historia o el entendimiento del jugador. El cambio puede ser pequeño pero significativo.
+- Meta: una experiencia memorable, no un juego grande.
+
+## Concepto
+- Híbrido de **granja + bullet hell**, single-player.
+- Estética pensada en **ASCII** (sprites como alternativa; no del todo decidido).
+
+## Mecánica central (decidido)
+- **La bala es el cultivo**: cultivas plantas que funcionan como tus proyectiles/armas.
+- Cuatro verbos: **arar** (prepara la celda), **plantar** (siembras y el cultivo crece unos segundos hasta volverse munición), **regar** (acelera el crecimiento / lo potencia), **disparar** (lanza el cultivo maduro; puede fusionarse con plantar dado que la bala = cultivo).
+- **Las semillas se diferencian por comportamiento, no por daño** (estilo armas de Metal Slug). ~3–4 tipos, incluyendo:
+  - Una **básica infinita** (regla clave de bullet hell: nunca dejar al jugador sin recurso).
+  - Al menos una **defensiva** (ej. enredadera = pared que bloquea balas; interactúa con el core de esquivar).
+  - Otras ofensivas (dispersión tipo escopeta, explosión en área, etc.).
+- **Slot 4 = poder / bomba** (convención de bullet hell): recurso limitado de alto impacto, se **carga jugando** (cosechar/disparar/matar, no por tiempo muerto).
+
+## El giro / estructura de dos fases (decidido — es el corazón del juego)
+- **Fase 1 (granja, calma):** usas teclas **1/2/3** (arar/regar/plantar) para sembrar tu hilera de cultivos. Sin presión.
+- **Trigger:** cuando se cultiva la **primera hilera** (o una cuenta regresiva), aparece un **AVISO** (el "WARNING" clásico de shmups), **baja el jefe**, **bloquea el cultivo** (ya no puedes plantar más) y el juego se vuelve **bullet hell**.
+- **Fase 2 (bullet hell):** puro esquive con flechas; los cultivos que ya creciste **disparan solos** al jefe mientras tú esquivas. La granja queda bloqueada.
+- **Principio clave:** la fase 1 debe **pagar** en la fase 2 → lo que cultivaste *es* tu arsenal. No hacer de la granja un trámite.
+- **Fairness:** el aviso necesita **1–2 segundos de telegrafía** antes del jefe para reposicionarse y "cambiar el chip". Eso vuelve emocionante (no frustrante) que te quiten los controles.
+- Para el jam: **un solo ciclo granja→jefe** es el scope correcto (loopear queda para después).
+- Nota de historia: se consideró acción continua (ref. Metal Slug), pero se **convergió en dos fases**.
+
+## Controles
+- **Fase 1:** flechas para moverte + 1/2/3 para las herramientas de granja.
+- **Fase 2:** **solo flechas** (granja bloqueada); el **poder es automático** al cargarse, para mantener la fase en un solo input. Si se quiere manual, barra espaciadora.
+- **El "todo cambia" también ocurre en el control:** tu set de teclas se reduce/transforma en el giro.
+- **Insight de diseño:** el split de dos fases **resuelve la ergonomía** — las teclas 1/2/3 viven en la calma (donde alcanzarlas no estorba) y la tormenta queda en puras flechas; nunca conviven bajo presión.
+- Opcional: botón de **focus** (mantener = moverte lento + hitbox chico y visible).
+- Se exploró una versión ultra-simplificada **"moverte + un botón"** (moverte = plantar = disparar = esquivar, acoplando ataque y defensa en el camino de movimiento; un botón = el poder). La dirección actual es la de dos fases.
+
+## Stack técnico
+- **Motor recomendado: **LÖVE/Love2D** (Lua, ultraligero, solo código sin editor, iteración instantánea, ideal para ASCII/sprites).
+- **ASCII como capa visual, NO terminal de cuadrícula estricta:** el bullet hell necesita movimiento suave sub-celda → posiciona jugador y balas con **floats** y solo dibújalos como glifos. Evitar libs de roguelike por turnos (python-tcod y similares) para la parte de acción.
+- **Perf:** dibujar las balas en **una sola pasada** (TileMap de glifos / `draw_char`), no un nodo por glifo.
+- **Legibilidad ASCII:** color + glifos distintos por rol (balas un símbolo/color, jugador otro, cultivos otro), fuente monoespaciada, patrones que no se amontonen en ruido.
+- Las dos fases encajan con ASCII: granja = **nativa de cuadrícula** (celdas/hileras; el trigger "primera hilera" es literal una fila del grid); esquive = **movimiento libre** sobre el mismo campo de glifos.
+
+## Hosting
+- Juego single-player = **archivos estáticos**, no necesita servidor.
+- **Para el jam: itch.io** (gratis, hecho para esto, tiene casilla de "SharedArrayBuffer support" que pone los headers sola, y ahí se sube la entrada). Alternativas estáticas gratis: **Netlify, Cloudflare Pages, GitHub Pages** (GH Pages requiere el truco `coi-serviceworker.js` con Godot 4).
+- **Droplet de DigitalOcean:** funciona pero es **overkill**; solo vale la pena si se agrega **backend** (leaderboard online con BD, multijugador, estado persistente). Godot 4 web necesita headers **COOP/COEP + HTTPS** (Caddy lo automatiza).
+
+## Decisiones abiertas / próximos pasos
+1. **Poder (slot 4): fijo vs rotativo.** Fijo = eliges el poder, más estratégico y fácil de balancear. Rotativo = el poder cargado va girando y disparas el que esté (idea tipo Mario, más caótico y más on-theme; si la selección manual se quita, el rotativo pasa a ser la fuente principal de variedad). Recomendación para 3 días: arrancar fijo, rotativo como stretch.
+2. **Trigger exacto:** "una hilera → jefe" (mínimo) vs **cuenta regresiva** que premia la codicia (sembrar más antes de que baje el jefe = más fuego, pero reaccionas más tarde → tensión codicia vs seguridad).
+3. **ASCII vs sprites** (definir; no afecta el hosting, ambos exportan a los mismos archivos estáticos).
+4. **Motor final:** Godot 4 vs LÖVE.
+5. **Definir las 3–4 semillas concretas** y el patrón de bala de cada una.
+6. **Diseñar el jefe** y sus patrones de bullet hell.
+7. **Escribir el one-pager del loop completo** (fases, trigger, cultivos, jefe, aviso) — pendiente.
