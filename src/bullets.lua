@@ -1,4 +1,5 @@
-local C = require("src.constants")
+local C   = require("src.constants")
+local Sfx = require("src.sfx")
 
 local Bullets = {}
 Bullets.__index = Bullets
@@ -13,6 +14,7 @@ end
 -- dmg_override: si se pasa, reemplaza el daño base (usado para upgrade corn_dmg)
 function Bullets:spawnCrop(x, y, seed, dmg_override)
     if seed == C.SEED_CORN then
+        Sfx.play("corn_shot", 0.1)   -- frecuente: volumen bajo + pitch variado (ver sfx.lua)
         self.crop[#self.crop + 1] = {
             x = x, y = y,
             vx = 0,
@@ -22,6 +24,7 @@ function Bullets:spawnCrop(x, y, seed, dmg_override)
             color  = {1.0, 1.0, 0.1},
         }
     elseif seed == C.SEED_PUMPKIN then
+        Sfx.play("pumpkin")
         -- 5-bullet fan centered on straight up (-π/2)
         local n      = C.PUMPKIN_BULLETS
         local spread = C.PUMPKIN_SPREAD

@@ -1,4 +1,5 @@
-local C = require("src.constants")
+local C   = require("src.constants")
+local Sfx = require("src.sfx")
 
 local Player = {}
 Player.__index = Player
@@ -103,6 +104,7 @@ function Player:tryHit()
     if self.inv_timer > 0 then return false end
     self.hp = self.hp - 1
     self.inv_timer = 2.0
+    Sfx.play("player_hurt")
     return true
 end
 

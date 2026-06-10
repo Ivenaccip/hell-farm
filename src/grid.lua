@@ -1,4 +1,5 @@
-local C = require("src.constants")
+local C   = require("src.constants")
+local Sfx = require("src.sfx")
 
 local Grid = {}
 Grid.__index = Grid
@@ -29,11 +30,14 @@ function Grid.new()
     return self
 end
 
+-- Devuelve true si la acción fue válida (para que main.lua suene solo en éxito)
 function Grid:plow(row, col)
     local cell = self.cells[row][col]
     if cell.state == C.CELL_EMPTY then
         cell.state = C.CELL_PLOWED
+        return true
     end
+    return false
 end
 
 function Grid:plant(row, col, seed)
@@ -43,7 +47,9 @@ function Grid:plant(row, col, seed)
         cell.seed       = seed
         cell.grow_timer = 0
         cell.grow_max   = C.GROW_TIME
+        return true
     end
+    return false
 end
 
 function Grid:water(row, col)
@@ -63,6 +69,7 @@ function Grid:update(dt)
                 cell.grow_timer = cell.grow_timer + dt
                 if cell.grow_timer >= cell.grow_max then
                     cell.state = C.CELL_MATURE
+                    Sfx.play("mature")
                 end
             end
         end

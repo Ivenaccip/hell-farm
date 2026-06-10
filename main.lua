@@ -4,6 +4,7 @@ local Bullets = require("src.bullets")
 local Boss    = require("src.boss")
 local Shop    = require("src.shop")
 local C       = require("src.constants")
+local Sfx     = require("src.sfx")
 
 local state, grid, bullets, boss
 local player       -- persiste entre niveles
@@ -51,6 +52,7 @@ local function full_reset()
     boss_buffs = { extra_hp = 0, fire_speedup = 0 }
     boss_last_learned = nil
     boss_evolved_by_purchase = false
+    Sfx.playMusic("farm")
 end
 
 local function next_level()
@@ -63,17 +65,22 @@ local function next_level()
     warn_timer = 0
     warn_pulse = 0
     farm_countdown = C.FARM_COUNTDOWN   -- nivel 2+ arranca con la cuenta regresiva
+    Sfx.playMusic("farm")
 end
 
 local function go_taunt()
     state       = C.STATE_TAUNT
     taunt_timer = 4.0
+    Sfx.play("taunt")
 end
 
 local function open_shop()
     player.coins = player.coins + 5
     shop_opt_a, shop_opt_b = Shop.roll(player)
     state = C.STATE_SHOP
+    -- El jefe acaba de morir: la música de batalla se desvanece poco a poco
+    -- mientras entra suave la de la tienda (efecto dramático de muerte).
+    Sfx.playMusic("shop", 1.5)
 end
 
 -- El jefe aprende un patrón aleatorio que aún no tenga. Si ya los tiene todos,
@@ -105,6 +112,7 @@ function buy_upgrade(opt)
     player.coins = player.coins - opt.cost
     grant_boss_pattern()
     boss_evolved_by_purchase = true
+    Sfx.play("buy")
     go_taunt()
 end
 
@@ -113,11 +121,13 @@ function love.load()
     small_font = love.graphics.newFont(20)
     big_font   = love.graphics.newFont(52)
     love.graphics.setFont(small_font)
+    Sfx.load()
     full_reset()
 end
 
 function love.update(dt)
     warn_pulse = warn_pulse + dt * 7
+    Sfx.update(dt)
 
     if state == C.STATE_FARM then
         grid:update(dt)
@@ -127,12 +137,17 @@ function love.update(dt)
             trigger = grid:anyRowComplete()
         else
             -- Nivel 2+: cuenta regresiva de siembra, baja el jefe al llegar a 0
+            local prev = math.ceil(farm_countdown)
             farm_countdown = farm_countdown - dt
+            local cur = math.ceil(farm_countdown)
+            if cur < prev and cur >= 1 then Sfx.play("tick") end   -- tic por segundo
             trigger = farm_countdown <= 0
         end
         if trigger then
             state      = C.STATE_WARNING
             warn_timer = C.WARNING_DURATION
+            Sfx.play("warning")
+            Sfx.playMusic("battle")   -- la música intensa arranca con el aviso
         end
 
     elseif state == C.STATE_WARNING then
@@ -151,8 +166,11 @@ function love.update(dt)
         bullets:update(dt, boss, player)
 
         if boss.hp <= 0 then
+            Sfx.play("boss_die")
             open_shop()   -- shop siempre primero, luego taunt
         elseif player.hp <= 0 then
+            Sfx.play("gameover")
+            Sfx.stopMusic()
             state = C.STATE_GAMEOVER
         end
 
@@ -172,8 +190,8 @@ function love.keypressed(key)
         elseif key == "right" then player:moveGrid(0,  1)
         elseif key == "up"    then player:moveGrid(-1,  0)
         elseif key == "down"  then player:moveGrid( 1,  0)
-        elseif key == "1"     then grid:plow(player.grid_row, player.grid_col)
-        elseif key == "2"     then grid:plant(player.grid_row, player.grid_col, C.SEED_CORN)
+        elseif key == "1"     then if grid:plow(player.grid_row, player.grid_col) then Sfx.play("plow") end
+        elseif key == "2"     then if grid:plant(player.grid_row, player.grid_col, C.SEED_CORN) then Sfx.play("plant") end
         end
 
     elseif state == C.STATE_BATTLE then
@@ -184,10 +202,10 @@ function love.keypressed(key)
         end
 
     elseif state == C.STATE_SHOP then
-        if key == "1" and player.coins >= shop_opt_a.cost then
-            buy_upgrade(shop_opt_a)
-        elseif key == "2" and player.coins >= shop_opt_b.cost then
-            buy_upgrade(shop_opt_b)
+        if key == "1" then
+            if player.coins >= shop_opt_a.cost then buy_upgrade(shop_opt_a) else Sfx.play("deny") end
+        elseif key == "2" then
+            if player.coins >= shop_opt_b.cost then buy_upgrade(shop_opt_b) else Sfx.play("deny") end
         elseif key == "s" then
             boss_evolved_by_purchase = false   -- guardaste: el jefe sube solo por nivel
             go_taunt()

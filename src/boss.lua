@@ -1,4 +1,5 @@
-local C = require("src.constants")
+local C   = require("src.constants")
+local Sfx = require("src.sfx")
 
 local Boss = {}
 Boss.__index = Boss
@@ -110,6 +111,7 @@ function Boss:checkHit(bx, by, damage)
             local mdy = by - m.y
             if mdx * mdx + mdy * mdy <= C.BOSS_MINION_HITBOX * C.BOSS_MINION_HITBOX then
                 m.hp = m.hp - damage
+                if m.hp <= 0 then Sfx.play("minion_die") else Sfx.play("hit_boss") end
                 return true
             end
         end
@@ -119,6 +121,7 @@ function Boss:checkHit(bx, by, damage)
     local dy = by - self.y
     if dx * dx + dy * dy <= HITBOX_R * HITBOX_R then
         self.hp = self.hp - damage
+        Sfx.play("hit_boss")
         return true
     end
 
@@ -126,6 +129,7 @@ function Boss:checkHit(bx, by, damage)
     if bx >= bar_x and bx <= bar_x + bw and
        by >= bar_y and by <= bar_y + bh then
         self.hp = self.hp - damage
+        Sfx.play("hit_boss")
         return true
     end
 
@@ -150,6 +154,7 @@ function Boss:update(dt, bullets, player)
         self.speed_mult = C.BOSS_ENRAGE_SPEED_MULT
         if self.vx then self.vx = self.vx * C.BOSS_ENRAGE_SPEED_MULT end
         if self.vy then self.vy = self.vy * C.BOSS_ENRAGE_SPEED_MULT end
+        Sfx.play("enrage")
     end
 
     -- Movimiento según los patrones que el jefe haya aprendido
@@ -224,6 +229,7 @@ function Boss:update(dt, bullets, player)
             self.x = self.min_x + math.random() * (self.max_x - self.min_x)
             self.y = self.min_y + math.random() * (self.max_y - self.min_y)
             self.teleport_flash = 0.3
+            Sfx.play("teleport")
             self:specialAttack(bullets)
         end
     end
@@ -251,6 +257,7 @@ end
 -- Gira y dispara N balas en círculo (360°)
 function Boss:specialAttack(bullets)
     self.spin_timer = C.BOSS_SPIN_DURATION
+    Sfx.play("spin")
     local n   = C.BOSS_SPECIAL_BULLETS
     local spd = C.BOSS_SPECIAL_SPEED
     for i = 1, n do
@@ -290,6 +297,7 @@ end
 
 -- Muro horizontal de balas que cae, con un hueco aleatorio por donde esquivar.
 function Boss:wallAttack(bullets)
+    Sfx.play("wall")
     local gap_x = MIN_X + math.random() * (MAX_X - MIN_X)
     local x = 20
     while x < C.WIN_W - 20 do
@@ -302,6 +310,7 @@ end
 
 -- Invoca de 2 a 3 minijefes alrededor del jefe.
 function Boss:summonMinions()
+    Sfx.play("summon")
     local n = math.random(C.BOSS_MINION_MIN, C.BOSS_MINION_MAX)
     for _ = 1, n do
         local angle = math.random() * 2 * math.pi
