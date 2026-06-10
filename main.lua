@@ -13,9 +13,28 @@ local warn_pulse   = 0
 local farm_countdown = 0   -- nivel 2+: cuenta regresiva de siembra (5→0)
 local taunt_timer  = 0
 local shop_opt_a, shop_opt_b
--- Evolución del jefe acoplada a la tienda (estilo Shotgun King)
-local boss_buffs   = { extra_hp = 0, fire_speedup = 0 }  -- se acumula con cada compra
-local boss_evolved_by_purchase = false                   -- ¿el último nivel se compró algo?
+-- Evolución del jefe acoplada a la tienda (estilo Shotgun King).
+-- Al comprar, el jefe aprende un PATRÓN aleatorio nuevo (desacoplado del nivel).
+-- Pool por prioridad: el jefe aprende primero todo el tier 1 (movimiento + giro,
+-- en orden aleatorio entre ellos), luego el tier 2, etc. Se ampliará con patrones futuros.
+-- El movimiento libre es base del jefe (siempre activo); no entra al pool.
+local BOSS_PATTERN_TIERS = {
+    { "spin" },           -- tier 1: garantizado en la primera compra
+    { "chase", "enrage", "spiral", "summon", "wall", "teleport" },  -- tier 2: aleatorios
+}
+local PATTERN_NAMES = {
+    spin     = "ataque giratorio",
+    chase    = "te persigue",
+    enrage   = "segunda forma (furia al 50%)",
+    spiral   = "espiral giratoria",
+    summon   = "invoca minijefes",
+    wall     = "muro de balas",
+    teleport = "teletransporte",
+}
+local boss_abilities = {}                                -- patrones que el jefe ya tiene { spin=true,... }
+local boss_buffs     = { extra_hp = 0, fire_speedup = 0 } -- fallback cuando el pool se agota
+local boss_last_learned = nil                            -- texto de lo último aprendido (para el taunt)
+local boss_evolved_by_purchase = false                   -- ¿se compró algo el último nivel?
 
 local small_font, big_font
 
@@ -28,7 +47,9 @@ local function full_reset()
     boss       = nil
     warn_timer = 0
     warn_pulse = 0
+    boss_abilities = {}
     boss_buffs = { extra_hp = 0, fire_speedup = 0 }
+    boss_last_learned = nil
     boss_evolved_by_purchase = false
 end
 
@@ -55,13 +76,34 @@ local function open_shop()
     state = C.STATE_SHOP
 end
 
--- Comprar una mejora: el jugador se potencia y, a cambio, el jefe del próximo
--- nivel se fortalece también (acoplamiento estilo Shotgun King).
+-- El jefe aprende un patrón aleatorio que aún no tenga. Si ya los tiene todos,
+-- cae a un refuerzo numérico (+vida/+cadencia) para no quedarse sin consecuencia.
+local function grant_boss_pattern()
+    -- Recorre los tiers en orden; dentro de cada uno elige aleatorio entre los no aprendidos.
+    for _, tier in ipairs(BOSS_PATTERN_TIERS) do
+        local available = {}
+        for _, p in ipairs(tier) do
+            if not boss_abilities[p] then available[#available + 1] = p end
+        end
+        if #available > 0 then
+            local pick = available[math.random(#available)]
+            boss_abilities[pick] = true
+            boss_last_learned = PATTERN_NAMES[pick]
+            return
+        end
+    end
+    -- Todos los patrones aprendidos: fallback numérico (+vida/+cadencia)
+    boss_buffs.extra_hp     = boss_buffs.extra_hp + C.BOSS_BUY_HP
+    boss_buffs.fire_speedup = boss_buffs.fire_speedup + C.BOSS_BUY_FIRE
+    boss_last_learned = "se vuelve m\xc3\xa1s resistente y r\xc3\xa1pido"
+end
+
+-- Comprar una mejora: el jugador se potencia y, a cambio, el jefe aprende un
+-- patrón nuevo aleatorio (acoplamiento estilo Shotgun King).
 function buy_upgrade(opt)
     Shop.apply(opt.id, player)
     player.coins = player.coins - opt.cost
-    boss_buffs.extra_hp     = boss_buffs.extra_hp + C.BOSS_BUY_HP
-    boss_buffs.fire_speedup = boss_buffs.fire_speedup + C.BOSS_BUY_FIRE
+    grant_boss_pattern()
     boss_evolved_by_purchase = true
     go_taunt()
 end
@@ -97,7 +139,7 @@ function love.update(dt)
         warn_timer = warn_timer - dt
         if warn_timer <= 0 then
             state = C.STATE_BATTLE
-            boss  = Boss.new(level, boss_buffs)
+            boss  = Boss.new(level, boss_abilities, boss_buffs)
             player:syncPixelFromGrid()
             grid:fireMatureCells(bullets, player)
         end
@@ -260,9 +302,9 @@ function draw_taunt()
     love.graphics.setFont(small_font)
     local evo
     if boss_evolved_by_purchase then
-        evo = "Tu mejora fortalece al jefe: dispara m\xc3\xa1s r\xc3\xa1pido y aguanta m\xc3\xa1s"
+        evo = "El jefe aprendi\xc3\xb3: " .. (boss_last_learned or "un truco nuevo")
     else
-        evo = "Guardaste tus monedas, pero el jefe se fortalece igual"
+        evo = "Guardaste tus monedas: el jefe no aprende nada nuevo"
     end
     love.graphics.setColor(1.0, 0.55, 0.15)
     love.graphics.print(evo, (C.WIN_W - small_font:getWidth(evo)) * 0.5, C.WIN_H * 0.60)

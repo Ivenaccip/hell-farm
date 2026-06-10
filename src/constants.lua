@@ -75,6 +75,37 @@ M.BOSS_CHASE_DURATION = 2.0      -- cuánto dura cada persecución
 M.BOSS_CHASE_SPEED    = 150      -- velocidad mientras persigue (rebote normal ≈ 110)
 M.BOSS_CONTACT_DAMAGE = true     -- el cuerpo del jefe daña al jugador al tocarlo
 
+-- Boss: segunda forma (enrage al 50% de vida)
+M.BOSS_ENRAGE_THRESHOLD  = 0.5   -- fracción de vida que dispara la furia
+M.BOSS_ENRAGE_FIRE_MULT  = 0.6   -- multiplica el intervalo de disparo (más cadencia)
+M.BOSS_ENRAGE_SPEED_MULT = 1.4   -- multiplica la velocidad de movimiento
+
+-- Boss: espiral giratoria (ráfaga de balas con ángulo que rota)
+M.BOSS_SPIRAL_INTERVAL = 6.0     -- segundos entre ráfagas de espiral
+M.BOSS_SPIRAL_COUNT    = 24      -- disparos por ráfaga
+M.BOSS_SPIRAL_GAP      = 0.06    -- segundos entre cada disparo de la espiral
+M.BOSS_SPIRAL_SPEED    = 130     -- velocidad de las balas de espiral
+M.BOSS_SPIRAL_STEP     = 0.5     -- rad que avanza el ángulo de emisión por disparo
+
+-- Boss: invocación de minijefes
+M.BOSS_SUMMON_INTERVAL     = 8.0 -- segundos entre oleadas (solo si no quedan minions)
+M.BOSS_MINION_MIN          = 2   -- mínimo de minions por oleada
+M.BOSS_MINION_MAX          = 3   -- máximo de minions por oleada
+M.BOSS_MINION_HP           = 5   -- vida de cada minion
+M.BOSS_MINION_SPEED        = 70  -- velocidad de rebote del minion
+M.BOSS_MINION_FIRE_RATE    = 2.2 -- segundos entre disparos del minion
+M.BOSS_MINION_BULLET_SPEED = 150 -- velocidad de las balas del minion
+M.BOSS_MINION_HITBOX       = 14  -- radio de colisión del minion
+
+-- Boss: muro de balas con hueco
+M.BOSS_WALL_INTERVAL = 7.0       -- segundos entre muros
+M.BOSS_WALL_SPEED    = 130       -- velocidad de caída del muro
+M.BOSS_WALL_GAP      = 48        -- medio ancho del hueco (px libres a cada lado del centro)
+M.BOSS_WALL_SPACING  = 34        -- separación horizontal entre balas del muro
+
+-- Boss: teletransporte (reaparece en otra zona y dispara radial)
+M.BOSS_TELEPORT_INTERVAL = 5.5   -- segundos entre teletransportes
+
 -- Player
 M.PLAYER_SPEED      = 200
 M.PLAYER_FOCUS_MULT = 0.45
