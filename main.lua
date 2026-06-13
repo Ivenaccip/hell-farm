@@ -24,13 +24,13 @@ local BOSS_PATTERN_TIERS = {
     { "chase", "enrage", "spiral", "summon", "wall", "teleport" },  -- tier 2: aleatorios
 }
 local PATTERN_NAMES = {
-    spin     = "ataque giratorio",
-    chase    = "te persigue",
-    enrage   = "segunda forma (furia al 50%)",
-    spiral   = "espiral giratoria",
-    summon   = "invoca minijefes",
-    wall     = "muro de balas",
-    teleport = "teletransporte",
+    spin     = "spinning attack",
+    chase    = "chases you",
+    enrage   = "second form (rage at 50%)",
+    spiral   = "spinning spiral",
+    summon   = "summons minibosses",
+    wall     = "bullet wall",
+    teleport = "teleport",
 }
 local boss_abilities = {}                                -- patrones que el jefe ya tiene { spin=true,... }
 local boss_buffs     = { extra_hp = 0, fire_speedup = 0 } -- fallback cuando el pool se agota
@@ -78,9 +78,7 @@ local function open_shop()
     player.coins = player.coins + 5
     shop_opt_a, shop_opt_b = Shop.roll(player)
     state = C.STATE_SHOP
-    -- El jefe acaba de morir: la música de batalla se desvanece poco a poco
-    -- mientras entra suave la de la tienda (efecto dramático de muerte).
-    Sfx.playMusic("shop", 1.5)
+    -- La música de la tienda ya entró con fade al iniciar la cinemática de muerte.
 end
 
 -- El jefe aprende un patrón aleatorio que aún no tenga. Si ya los tiene todos,
@@ -102,7 +100,7 @@ local function grant_boss_pattern()
     -- Todos los patrones aprendidos: fallback numérico (+vida/+cadencia)
     boss_buffs.extra_hp     = boss_buffs.extra_hp + C.BOSS_BUY_HP
     boss_buffs.fire_speedup = boss_buffs.fire_speedup + C.BOSS_BUY_FIRE
-    boss_last_learned = "se vuelve m\xc3\xa1s resistente y r\xc3\xa1pido"
+    boss_last_learned = "grows tougher and faster"
 end
 
 -- Comprar una mejora: el jugador se potencia y, a cambio, el jefe aprende un
@@ -121,6 +119,7 @@ function love.load()
     small_font = love.graphics.newFont(20)
     big_font   = love.graphics.newFont(52)
     love.graphics.setFont(small_font)
+    Boss.loadAssets()   -- carga opcional del sprite (diferida: love ya esta listo)
     Sfx.load()
     full_reset()
 end
@@ -165,9 +164,15 @@ function love.update(dt)
         boss:update(dt, bullets, player)
         bullets:update(dt, boss, player)
 
-        if boss.hp <= 0 then
+        if boss.dying then
+            -- Cinemática de muerte en curso: esperar a que el jefe se desvanezca
+            if boss:isDeathDone() then open_shop() end
+        elseif boss.hp <= 0 then
+            -- Arranca la cinemática: el jefe se desvanece y la música baja con él
+            boss:startDying()
+            bullets.enemy = {}   -- limpiar balas enemigas (no morir durante la animación)
             Sfx.play("boss_die")
-            open_shop()   -- shop siempre primero, luego taunt
+            Sfx.playMusic("shop", C.BOSS_DEATH_DURATION)
         elseif player.hp <= 0 then
             Sfx.play("gameover")
             Sfx.stopMusic()
@@ -267,12 +272,16 @@ end
 function draw_farm_hud()
     love.graphics.setColor(0.75, 0.75, 0.65)
     if player.pumpkin_unlocked then
-        love.graphics.print("Calabaza: poder [Espacio] en batalla", 10, C.WIN_H - 46)
+        love.graphics.print("Pumpkin: [Space] power in battle", 10, C.WIN_H - 46)
     end
-    love.graphics.print("[1] Arar   [2] Plantar maiz", 10, C.WIN_H - 24)
+    love.graphics.print("[1] Plow   [2] Plant corn", 10, C.WIN_H - 24)
+    -- Recordatorio de pantalla completa (web), centrado entre corazones y monedas
+    love.graphics.setColor(0.55, 0.75, 0.55)
+    local fs = "Press Go Fullscreen"
+    love.graphics.print(fs, (C.WIN_W - small_font:getWidth(fs)) * 0.5, 10)
     -- Monedas
     love.graphics.setColor(1.0, 0.85, 0.2)
-    local c = "Monedas: " .. player.coins
+    local c = "Coins: " .. player.coins
     love.graphics.print(c, C.WIN_W - small_font:getWidth(c) - 10, 10)
 end
 
@@ -290,7 +299,7 @@ function draw_farm_countdown()
     local n = math.max(1, math.ceil(farm_countdown))
     -- Etiqueta
     love.graphics.setColor(0.85, 0.55, 0.20)
-    local label = "El jefe llega en..."
+    local label = "Boss arrives in..."
     love.graphics.print(label, (C.WIN_W - small_font:getWidth(label)) * 0.5, 22)
     -- Número grande pulsante (más rojo conforme baja)
     love.graphics.setFont(big_font)
@@ -308,8 +317,8 @@ function draw_taunt()
     -- Pulso rojo en el texto
     local pulse = 0.75 + (math.sin(warn_pulse * 0.8) + 1) * 0.125
     love.graphics.setColor(1.0, 0.12, 0.12, pulse)
-    local msg = "\xc2\xbfCre\xc3\xadste que iba"
-    local msg2 = "a ser tan f\xc3\xa1cil?"
+    local msg = "Did you think"
+    local msg2 = "it would be that easy?"
     local w1 = big_font:getWidth(msg)
     local w2 = big_font:getWidth(msg2)
     local fh = big_font:getHeight()
@@ -320,15 +329,15 @@ function draw_taunt()
     love.graphics.setFont(small_font)
     local evo
     if boss_evolved_by_purchase then
-        evo = "El jefe aprendi\xc3\xb3: " .. (boss_last_learned or "un truco nuevo")
+        evo = "The boss learned: " .. (boss_last_learned or "a new trick")
     else
-        evo = "Guardaste tus monedas: el jefe no aprende nada nuevo"
+        evo = "You saved your coins: the boss learns nothing new"
     end
     love.graphics.setColor(1.0, 0.55, 0.15)
     love.graphics.print(evo, (C.WIN_W - small_font:getWidth(evo)) * 0.5, C.WIN_H * 0.60)
 
     love.graphics.setColor(0.45, 0.45, 0.42)
-    local hint = "Presiona cualquier tecla para continuar..."
+    local hint = "Press any key to continue..."
     love.graphics.print(hint, (C.WIN_W - small_font:getWidth(hint)) * 0.5, C.WIN_H * 0.72)
 end
 
@@ -339,7 +348,7 @@ function draw_end_screen(msg, color)
     love.graphics.print(msg, (C.WIN_W - w) * 0.5, C.WIN_H * 0.38)
     love.graphics.setFont(small_font)
     love.graphics.setColor(0.80, 0.80, 0.75)
-    local sub = "Presiona R para reiniciar"
+    local sub = "Press R to restart"
     local sw  = small_font:getWidth(sub)
     love.graphics.print(sub, (C.WIN_W - sw) * 0.5, C.WIN_H * 0.55)
 end

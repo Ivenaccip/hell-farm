@@ -4,12 +4,12 @@ local Shop = {}
 
 -- Definición de todas las mejoras disponibles
 Shop.UPGRADES = {
-    { id = "speed",     label = "Velocidad",           desc = "+10% velocidad",          cost = 3  },
-    { id = "hp",        label = "Vida Extra",           desc = "+1 corazon",              cost = 10 },
-    { id = "autofarm",  label = "Auto-farm Rapido",     desc = "-0.05s tick de cultivo",  cost = 3  },
-    { id = "corn_rate", label = "Cadencia Maiz",        desc = "-0.1s entre disparos",    cost = 2  },
-    { id = "corn_dmg",  label = "Daño Maiz",            desc = "+0.1 daño por bala",      cost = 3  },
-    { id = "pumpkin",   label = "Desbloquear Calabaza", desc = "Activa [E] + Espacio",    cost = 5  },
+    { id = "speed",     label = "Speed",                desc = "+10% speed",              cost = 3  },
+    { id = "hp",        label = "Extra Life",           desc = "+1 heart",                cost = 10 },
+    { id = "autofarm",  label = "Faster Auto-farm",     desc = "-0.05s crop tick",        cost = 3  },
+    { id = "corn_rate", label = "Corn Cadence",         desc = "-0.1s between shots",      cost = 2  },
+    { id = "corn_dmg",  label = "Corn Damage",          desc = "+0.1 damage per bullet",  cost = 3  },
+    { id = "pumpkin",   label = "Unlock Pumpkin",       desc = "Enables [Space] power",   cost = 5  },
 }
 
 -- Devuelve 2 mejoras aleatorias (filtra pumpkin si ya está desbloqueada)
@@ -57,13 +57,13 @@ function Shop.draw(player, opt_a, opt_b, small_font, big_font)
     -- Título
     love.graphics.setFont(big_font)
     love.graphics.setColor(1.0, 0.85, 0.20)
-    local title = "TIENDA"
+    local title = "SHOP"
     love.graphics.print(title, (W - big_font:getWidth(title)) * 0.5, 48)
 
     -- Monedas
     love.graphics.setFont(small_font)
     love.graphics.setColor(1.0, 0.85, 0.20)
-    local coin_str = "Monedas: " .. player.coins
+    local coin_str = "Coins: " .. player.coins
     love.graphics.print(coin_str, (W - small_font:getWidth(coin_str)) * 0.5, 116)
 
     -- Dos tarjetas
@@ -72,7 +72,7 @@ function Shop.draw(player, opt_a, opt_b, small_font, big_font)
 
     -- Guardar
     love.graphics.setColor(0.55, 0.55, 0.50)
-    local save = "[S]  Guardar monedas y continuar"
+    local save = "[S]  Save coins and continue"
     love.graphics.print(save, (W - small_font:getWidth(save)) * 0.5, H - 64)
 end
 
@@ -108,12 +108,12 @@ function Shop.drawCard(upgrade, coins, x, y, w, h, key, font)
 
     -- Costo
     love.graphics.setColor(afford and {1.0, 0.85, 0.2} or {0.55, 0.35, 0.25})
-    love.graphics.print("Costo: " .. upgrade.cost .. " monedas", x + pad, ty)
+    love.graphics.print("Cost: " .. upgrade.cost .. " coins", x + pad, ty)
 
     -- Sin fondos
     if not afford then
         love.graphics.setColor(1.0, 0.30, 0.30)
-        local no = "Sin fondos"
+        local no = "Can't afford"
         love.graphics.print(no, x + w - font:getWidth(no) - pad, y + h - fh - pad)
     end
 end

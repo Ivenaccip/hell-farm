@@ -116,12 +116,9 @@ function Player:draw(phase)
         x, y = self:gridCenter()
     end
 
-    -- Blink while invincible
-    if self.inv_timer > 0 and math.floor(self.inv_timer * 10) % 2 == 0 then
-        goto draw_hp
-    end
-
-    do
+    -- Blink while invincible: skip drawing the player sprite this frame
+    local blinking = self.inv_timer > 0 and math.floor(self.inv_timer * 10) % 2 == 0
+    if not blinking then
         local font   = love.graphics.getFont()
         local glyph  = "^"
         local fw     = font:getWidth(glyph)
@@ -136,7 +133,6 @@ function Player:draw(phase)
         end
     end
 
-    ::draw_hp::
     -- HP hearts (filled = vivo, vacío = perdido)
     local heart_on  = "<3"
     local heart_off = "</3"  -- slot vacío si hubo upgrade de HP
@@ -154,7 +150,7 @@ function Player:draw(phase)
     if phase == C.STATE_BATTLE and self.pumpkin_unlocked then
         if self.space_cd <= 0 then
             love.graphics.setColor(1.0, 0.50, 0.0)
-            love.graphics.print("[SPC] LISTO", C.WIN_W - 120, 10)
+            love.graphics.print("[SPC] READY", C.WIN_W - 120, 10)
         else
             love.graphics.setColor(0.50, 0.30, 0.10)
             love.graphics.print(string.format("[SPC] %.1fs", self.space_cd), C.WIN_W - 120, 10)

@@ -12,11 +12,18 @@ local BAR_H    = 7
 -- Se carga una sola vez (no por instancia).
 local SPRITE       = nil
 local SPRITE_SCALE = 1
-do
+-- Carga opcional del sprite. Se llama desde love.load() (NO durante el require):
+-- en love.js intentar cargar una imagen inexistente en tiempo de require provoca
+-- un fallo a nivel C que el pcall no atrapa. Por eso comprobamos primero que el
+-- archivo exista con love.filesystem.getInfo y diferimos la llamada a love.load.
+function Boss.loadAssets()
+    if SPRITE then return end                       -- ya cargado
+    local info = love.filesystem.getInfo("assets/boss.png")
+    if not info then return end                     -- no hay boss.png: fallback ASCII
     local ok, img = pcall(love.graphics.newImage, "assets/boss.png")
-    if ok then
+    if ok and img then
         SPRITE = img
-        SPRITE:setFilter("nearest", "nearest")   -- pixel-art nítido al escalar
+        SPRITE:setFilter("nearest", "nearest")      -- pixel-art nítido al escalar
         -- Escala para que el sprite mida ~ 2*HITBOX_R de ancho visual
         SPRITE_SCALE = (HITBOX_R * 2.4) / SPRITE:getWidth()
     end
@@ -75,11 +82,18 @@ function Boss.new(level, abilities, buffs)
 
     self.minions = {}            -- minijefes vivos { x, y, hp, vx, vy, fire_timer }
 
-    -- Si aprendió a perseguir, invade toda la pantalla (baja a la zona de cultivos).
+    -- Cinemática de muerte (fade)
+    self.dying   = false
+    self.death_t = 0
+    self.alpha   = 1.0           -- opacidad del jefe (baja a 0 al morir)
+
+    -- El rebote libre vive SIEMPRE en la franja superior; solo la persecución puede
+    -- bajar a la zona de cultivos (chase_max_y). Así el jefe no se queda abajo del jugador.
     self.min_x = MIN_X
     self.max_x = MAX_X
     self.min_y = MIN_Y
-    self.max_y = self.can_chase and (C.WIN_H - 40) or MAX_Y
+    self.max_y = MAX_Y
+    self.chase_max_y = self.can_chase and (C.WIN_H - 40) or MAX_Y
 
     -- El jefe se mueve libre (rebote 2D) desde el primer nivel para que no sea estático.
     local angle = math.pi * 0.25 + math.random() * math.pi * 0.5
@@ -102,7 +116,7 @@ function Boss:barRect()
 end
 
 function Boss:checkHit(bx, by, damage)
-    if self.entering then return false end
+    if self.entering or self.dying then return false end
 
     -- Minijefes primero: si la bala pega a uno, le resta vida a ÉL (no al jefe principal).
     for _, m in ipairs(self.minions) do
@@ -136,7 +150,25 @@ function Boss:checkHit(bx, by, damage)
     return false
 end
 
+-- Inicia la cinemática de muerte: el jefe deja de actuar y se desvanece.
+function Boss:startDying()
+    self.dying   = true
+    self.death_t = 0
+    self.minions = {}   -- los minijefes se van con el jefe
+end
+
+function Boss:isDeathDone()
+    return self.dying and self.death_t >= C.BOSS_DEATH_DURATION
+end
+
 function Boss:update(dt, bullets, player)
+    -- Cinemática de muerte: se desvanece y deja de moverse/atacar
+    if self.dying then
+        self.death_t = self.death_t + dt
+        self.alpha = math.max(0, 1 - self.death_t / C.BOSS_DEATH_DURATION)
+        return
+    end
+
     -- Entrada desde arriba
     if self.entering then
         self.y = self.y + 200 * dt
@@ -164,12 +196,11 @@ function Boss:update(dt, bullets, player)
             self.chase_timer = self.chase_timer - dt
             self:chase(dt, player)
             if self.chase_timer <= 0 then
-                -- Termina: vuelve al rebote en la dirección que traía
+                -- Termina: sube de regreso a su franja (no se queda abajo del jugador)
                 local nx = self.last_nx or 0.7
-                local ny = self.last_ny or 0.7
                 local spd = C.BOSS_SPEED * 1.3 * self.speed_mult
                 self.vx = nx * spd
-                self.vy = ny * spd
+                self.vy = -math.abs(spd * 0.8)   -- vy negativo = hacia arriba
             end
         else
             self:moveFree(dt)
@@ -364,7 +395,9 @@ function Boss:moveFree(dt)
     if self.x <= self.min_x then self.x = self.min_x; self.vx =  math.abs(self.vx) end
     if self.x >= self.max_x then self.x = self.max_x; self.vx = -math.abs(self.vx) end
     if self.y <= self.min_y then self.y = self.min_y; self.vy =  math.abs(self.vy) end
-    if self.y >= self.max_y then self.y = self.max_y; self.vy = -math.abs(self.vy) end
+    -- Rebote inferior solo si va BAJANDO; si viene de una persecución (por debajo de
+    -- la franja y subiendo) se le deja subir libremente hasta volver arriba.
+    if self.y >= self.max_y and self.vy > 0 then self.y = self.max_y; self.vy = -math.abs(self.vy) end
 end
 
 -- Persecución (nivel 3+): se mueve hacia el jugador con velocidad aumentada.
@@ -378,9 +411,9 @@ function Boss:chase(dt, player)
         local spd = C.BOSS_CHASE_SPEED * self.speed_mult
         self.x = self.x + nx * spd * dt
         self.y = self.y + ny * spd * dt
-        -- Clamp a los límites (toda la pantalla en nivel 3)
+        -- Clamp a los límites (la persecución puede bajar hasta chase_max_y)
         self.x = math.max(self.min_x, math.min(self.max_x, self.x))
-        self.y = math.max(self.min_y, math.min(self.max_y, self.y))
+        self.y = math.max(self.min_y, math.min(self.chase_max_y, self.y))
         self.last_nx, self.last_ny = nx, ny
     end
 end
@@ -427,7 +460,7 @@ function Boss:draw()
         end
 
         if SPRITE then
-            love.graphics.setColor(cr, cg, cb)
+            love.graphics.setColor(cr, cg, cb, self.alpha)
             love.graphics.draw(
                 SPRITE, self.x, self.y, self.spin_angle,
                 SPRITE_SCALE, SPRITE_SCALE,
@@ -437,11 +470,11 @@ function Boss:draw()
             -- Fallback ASCII (también rota sobre su eje durante el ataque especial)
             local lines = { "[-BOSS-]", "\\|||||/" }
             if self.enraged then
-                love.graphics.setColor(1.0, 0.15, 0.75)
+                love.graphics.setColor(1.0, 0.15, 0.75, self.alpha)
             elseif self.chase_timer > 0 then
-                love.graphics.setColor(1.0, 0.45, 0.0)   -- naranja brillante al perseguir
+                love.graphics.setColor(1.0, 0.45, 0.0, self.alpha)   -- naranja brillante al perseguir
             else
-                love.graphics.setColor(1.0, 0.15, 0.15)
+                love.graphics.setColor(1.0, 0.15, 0.15, self.alpha)
             end
             love.graphics.push()
             love.graphics.translate(self.x, self.y)
@@ -459,13 +492,15 @@ function Boss:draw()
             love.graphics.circle("line", self.x, self.y, HITBOX_R + 10)
         end
 
-        -- Barra de vida
-        local bar_x, bar_y, bw, bh = self:barRect()
-        local pct = math.max(0, self.hp / self.max_hp)
-        love.graphics.setColor(0.35, 0.05, 0.05)
-        love.graphics.rectangle("fill", bar_x, bar_y, bw, bh)
-        love.graphics.setColor(1.0, 0.10, 0.10)
-        love.graphics.rectangle("fill", bar_x, bar_y, bw * pct, bh)
+        -- Barra de vida (oculta durante la cinemática de muerte)
+        if not self.dying then
+            local bar_x, bar_y, bw, bh = self:barRect()
+            local pct = math.max(0, self.hp / self.max_hp)
+            love.graphics.setColor(0.35, 0.05, 0.05)
+            love.graphics.rectangle("fill", bar_x, bar_y, bw, bh)
+            love.graphics.setColor(1.0, 0.10, 0.10)
+            love.graphics.rectangle("fill", bar_x, bar_y, bw * pct, bh)
+        end
     end
 end
 

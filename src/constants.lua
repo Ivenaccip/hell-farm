@@ -106,6 +106,9 @@ M.BOSS_WALL_SPACING  = 34        -- separación horizontal entre balas del muro
 -- Boss: teletransporte (reaparece en otra zona y dispara radial)
 M.BOSS_TELEPORT_INTERVAL = 5.5   -- segundos entre teletransportes
 
+-- Boss: cinemática de muerte (se desvanece poco a poco antes de la tienda)
+M.BOSS_DEATH_DURATION = 1.5      -- segundos del fade de muerte (igual al fade de música)
+
 -- Player
 M.PLAYER_SPEED      = 200
 M.PLAYER_FOCUS_MULT = 0.45
